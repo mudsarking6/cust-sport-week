@@ -1,0 +1,20 @@
+{
+  "name": "cust-sports-week",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run build --workspace frontend",
+    "start": "npm run start --workspace backend",
+    "server": "npm run dev --workspace backend",
+    "client": "npm run dev --workspace frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules/
+**/dist/
+data/*.db
+.env
+info.env
+Apikey.txt
+updatedapi.env
+/uploads/
+.vercel/
+npm-debug.log*
