@@ -31,7 +31,7 @@ test('Drive OAuth client uses the configured user refresh token', () => {
 
   assert.equal(auth.credentials.refresh_token, 'test-refresh-token');
   assert.equal(auth.credentials.scope, GOOGLE_DRIVE_SCOPE);
-  assert.equal(GOOGLE_DRIVE_SCOPE, 'https://www.googleapis.com/auth/drive.file');
+  assert.equal(GOOGLE_DRIVE_SCOPE, 'https://www.googleapis.com/auth/drive');
 });
 
 test('Drive OAuth client rejects missing configuration without exposing credentials', () => {
