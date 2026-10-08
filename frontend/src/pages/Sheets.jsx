@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
-import {ClipboardList,Download,FileCheck2,FileClock,Plus,Search,Users} from 'lucide-react';
+import {ClipboardList,Download,ExternalLink,FileCheck2,FileClock,Plus,Search,Users} from 'lucide-react';
 import {Link,useNavigate} from 'react-router-dom';
 import {api} from '../api';
 import {useAuth,useToast} from '../App';
@@ -87,6 +87,7 @@ export default function Sheets(){
           <footer>Prepared by <b>{sheet.submittedBy}</b></footer>
         </Link>
         <div className="sheet-card-actions">
+          {sheet.driveFileUrl&&<a className="drive-file-link" href={sheet.driveFileUrl} target="_blank" rel="noopener noreferrer"><ExternalLink/> View Excel File</a>}
           <button onClick={()=>exportExcel(sheet)}><Download/> Export Excel</button>
           <button className="delete-action" onClick={()=>setDeleteTarget(sheet)}>Delete</button>
         </div>

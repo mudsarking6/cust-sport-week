@@ -50,6 +50,21 @@ Deploy the repository root as a Render Blueprint using `render.yaml`. Set the se
 
 Render’s local filesystem is ephemeral on the free plan. Uploaded announcement and reminder attachments stored under `uploads/` will not survive service restarts or redeploys unless persistent storage or external object storage is configured.
 
+## Google Drive Excel synchronization
+
+MongoDB remains the source of truth. Each MongoDB `sheets` document gets one `.xlsx` file in the configured Google Drive folder. The file is rebuilt from its related MongoDB `student_records` after adds, edits, deletes, imports, and retries. Failed Google Drive API calls leave MongoDB data intact; retry synchronization from the player-sheet detail page.
+
+To enable synchronization:
+
+1. In Google Cloud, enable the Google Drive API and create a service account.
+2. In your Google Drive, create a folder named `CUST Sports Week`, share it with the service-account email as an Editor, and copy the folder ID.
+3. Add these variables to the backend service environment in Railway or Render:
+   - `GOOGLE_SERVICE_ACCOUNT_JSON` — the service account JSON document
+   - `GOOGLE_DRIVE_FOLDER_ID` — the folder ID from step 2
+4. Redeploy/restart the backend after setting the variables.
+
+Generated Excel files are shared as **Anyone with the link — Viewer**, preserving the existing link-access behavior. Anyone who obtains a file URL can see its student rows, including contact numbers. Do not store passwords or other credentials in player records. Never put the service-account JSON in frontend configuration, `info.env`, or Git.
+
 ## Excel columns
 
 Player imports recognize: `Student Name`, `Registration Number`, `Department`, `Semester`, `Section`, `Contact Number`, and `Position`.

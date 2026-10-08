@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { auth, allow, coordinator, operational, signToken, supportOnly, supportOrHod } from './auth.js';
 import { closeDb, collection, idString, initDb, newId, now, objectId, serialize } from './db.js';
 import { config } from './config.js';
+import {
+  deleteDriveExcelFile, syncDriveExcelFile
+} from './googleDriveExcel.js';
 
 const root = config.projectRoot;
 const app = express();
@@ -88,6 +91,62 @@ const readApiKeyFile = file => {
 };
 const groqApiKey = (process.env.GROQ_API_KEY || readApiKeyFile('updatedapi.env') || readApiKeyFile('Apikey.txt')).trim();
 const groqModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
+const driveSyncQueues = new Map();
+async function performDriveExcelSync(sheetId) {
+  const id = objectId(sheetId);
+  const sheet = await collection('sheets').findOne({ _id: id });
+  if (!sheet) return { status: 'MISSING', fileUrl: '' };
+
+  let fileId = sheet.google_drive_file_id;
+  let fileUrl = sheet.google_drive_file_url || '';
+  try {
+    const [game, records] = await Promise.all([
+      collection('games').findOne({ _id: sheet.game_id }),
+      collection('student_records').find({ sheet_id: id }).sort({ created_at: 1, _id: 1 }).toArray()
+    ]);
+    const savedFile = await syncDriveExcelFile(id, sheet.title, fileId, records, game?.name || '');
+    fileId = savedFile.fileId;
+    fileUrl = savedFile.fileUrl;
+    await collection('sheets').updateOne({ _id: id }, {
+      $set: {
+        google_drive_file_id: fileId,
+        google_drive_file_url: fileUrl,
+        drive_sync_status: 'SYNCED',
+        drive_sync_error: '',
+        drive_synced_at: now()
+      }
+    });
+    return { status: 'SYNCED', fileUrl };
+  } catch (error) {
+    console.error('Google Drive Excel sync failed', { sheetId: String(id), message: error.message });
+    try {
+      await collection('sheets').updateOne({ _id: id }, {
+        $set: {
+          drive_sync_status: 'PENDING',
+          drive_sync_error: 'Google Drive Excel sync failed. Retry synchronization from the player sheet.'
+        }
+      });
+    } catch (statusError) {
+      console.error('Could not record Google Drive Excel sync status', {
+        sheetId: String(id), message: statusError.message
+      });
+    }
+    return { status: 'PENDING', fileUrl };
+  }
+}
+
+async function syncSheetToDrive(sheetId) {
+  const key = String(sheetId);
+  const previous = driveSyncQueues.get(key) || Promise.resolve();
+  const current = previous.catch(() => {}).then(() => performDriveExcelSync(sheetId));
+  driveSyncQueues.set(key, current);
+  try {
+    return await current;
+  } finally {
+    if (driveSyncQueues.get(key) === current) driveSyncQueues.delete(key);
+  }
+}
 
 function sheetVisible(sheet, user, forwards, deletions) {
   const userId = String(user.id || user._id);
@@ -470,6 +529,8 @@ app.get('/api/sheets', auth, operational, wrap(async (req, res) => {
   ]);
   res.json(sheets.map(sheet => ({
     id: sheet.id, title: sheet.title, status: sheet.status, notes: sheet.notes, fileName: sheet.file_name,
+    driveFileUrl: sheet.google_drive_file_url || '',
+    driveSyncStatus: sheet.drive_sync_status || 'PENDING',
     createdAt: sheet.created_at, submittedAt: sheet.submitted_at,
     gameId: String(sheet.game_id), game: games.find(row => row.id === String(sheet.game_id))?.name || '',
     submittedBy: users.find(row => row.id === String(sheet.submitted_by))?.name || '',
@@ -486,7 +547,24 @@ app.post('/api/sheets', auth, coordinator, wrap(async (req, res) => {
     title: req.body.title, game_id: gameId, submitted_by: req.user._id, status: 'DRAFT',
     notes: req.body.notes || '', file_name: null, created_at: now(), submitted_at: null
   });
-  res.status(201).json({ id: sheet.id, message: 'Draft sheet created' });
+  const driveSync = await syncSheetToDrive(sheet.id);
+  res.status(201).json({
+    id: sheet.id, message: 'Draft sheet created',
+    driveFileUrl: driveSync.fileUrl,
+    driveSyncStatus: driveSync.status
+  });
+}));
+app.post('/api/sheets/:id/google-sync', auth, coordinator, wrap(async (req, res) => {
+  const sheet = await accessibleSheet(req);
+  if (!sheet) return res.status(404).json({ message: 'Sheet not found' });
+  const driveSync = await syncSheetToDrive(sheet._id);
+  res.json({
+    driveFileUrl: driveSync.fileUrl,
+    driveSyncStatus: driveSync.status,
+    message: driveSync.status === 'SYNCED'
+      ? 'Excel file synchronized to Google Drive'
+      : 'MongoDB is unchanged; Google Drive Excel sync is still pending'
+  });
 }));
 
 async function accessibleSheet(req) {
@@ -552,6 +630,15 @@ app.delete('/api/sheets/:id', auth, operational, wrap(async (req, res) => {
     collection('student_records').deleteMany({ sheet_id: sheet._id }),
     collection('sheets').deleteOne({ _id: sheet._id })
   ]);
+  if (sheet.google_drive_file_id) {
+    try {
+      await deleteDriveExcelFile(sheet.google_drive_file_id);
+    } catch (error) {
+      console.error('Could not delete Google Drive Excel file for deleted player sheet', {
+        sheetId: String(sheet._id), message: error.message
+      });
+    }
+  }
   res.json({ message: 'Sheet deleted for everyone' });
 }));
 
@@ -567,10 +654,16 @@ app.post('/api/sheets/:id/records', auth, coordinator, wrap(async (req, res) => 
   const sheet = await collection('sheets').findOne({ _id: objectId(req.params.id) });
   if (!sheet) return res.status(404).json({ message: 'Sheet not found' });
   const record = await addStudent(sheet, req, req.body);
-  res.status(201).json({ id: record.id, message: 'Player added' });
+  const driveSync = await syncSheetToDrive(sheet._id);
+  res.status(201).json({
+    id: record.id, message: 'Player added',
+    driveSyncStatus: driveSync.status
+  });
 }));
 app.patch('/api/records/:id', auth, coordinator, wrap(async (req, res) => {
   const values = req.body;
+  const record = await collection('student_records').findOne({ _id: objectId(req.params.id) });
+  if (!record) return res.status(404).json({ message: 'Player not found' });
   const result = await collection('student_records').updateOne({ _id: objectId(req.params.id) }, {
     $set: {
       student_name: values.studentName, registration_no: values.registrationNo, department: values.department,
@@ -579,12 +672,16 @@ app.patch('/api/records/:id', auth, coordinator, wrap(async (req, res) => {
     }
   });
   if (!result.matchedCount) return res.status(404).json({ message: 'Player not found' });
-  res.json({ message: 'Player updated' });
+  const driveSync = await syncSheetToDrive(record.sheet_id);
+  res.json({ message: 'Player updated', driveSyncStatus: driveSync.status });
 }));
 app.delete('/api/records/:id', auth, coordinator, wrap(async (req, res) => {
+  const record = await collection('student_records').findOne({ _id: objectId(req.params.id) });
+  if (!record) return res.status(404).json({ message: 'Player not found' });
   const result = await collection('student_records').deleteOne({ _id: objectId(req.params.id) });
   if (!result.deletedCount) return res.status(404).json({ message: 'Player not found' });
-  res.json({ message: 'Player removed' });
+  const driveSync = await syncSheetToDrive(record.sheet_id);
+  res.json({ message: 'Player removed', driveSyncStatus: driveSync.status });
 }));
 app.post('/api/sheets/:id/import', auth, coordinator, upload.single('file'), wrap(async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'Select an Excel file' });
@@ -604,7 +701,11 @@ app.post('/api/sheets/:id/import', auth, coordinator, upload.single('file'), wra
   });
   if (records.length) await collection('student_records').insertMany(records);
   await collection('sheets').updateOne({ _id: sheet._id }, { $set: { file_name: req.file.originalname } });
-  res.json({ message: `${records.length} player records imported`, count: records.length });
+  const driveSync = await syncSheetToDrive(sheet._id);
+  res.json({
+    message: `${records.length} player records imported`, count: records.length,
+    driveSyncStatus: driveSync.status
+  });
 }));
 app.post('/api/sheets/:id/submit', auth, coordinator, wrap(async (req, res) => {
   const sheet = await collection('sheets').findOne({ _id: objectId(req.params.id) });
