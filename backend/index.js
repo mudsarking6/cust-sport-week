@@ -35,6 +35,14 @@ app.use('/uploads', express.static(path.join(root, 'uploads')));
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/debug/groq-status', (req, res) => {
+  res.json({
+    configured: Boolean(
+      process.env.GROQ_API_KEY &&
+      process.env.GROQ_API_KEY.trim()
+    )
+  });
+});
 const docs = async (name, query = {}) => (await collection(name).find(query).toArray()).map(serialize);
 const doc = async (name, query = {}) => serialize(await collection(name).findOne(query));
 const byId = (name, id) => doc(name, { _id: objectId(id) });
