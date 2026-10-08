@@ -1,9 +1,45 @@
 @media(max-width:900px){
   .badge-studio-grid{grid-template-columns:minmax(0,1fr)}
   .sent-badge-grid,.received-badge-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .game-grid{grid-template-columns:minmax(0,1fr)}
+}
+
+@media(max-width:1050px){
+  .stat-grid.compact{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+@media(max-width:760px){
+  .game-card{min-width:0;display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start}
+  .game-info{min-width:0}
+  .game-info footer{min-width:0;flex-wrap:wrap;gap:6px 10px;line-height:1.4}
+  .game-info footer span{min-width:0;overflow-wrap:anywhere}
+  .game-actions{position:static;grid-column:2;grid-row:2;justify-self:end;margin-top:-4px}
+  .game-actions button{min-width:40px;min-height:40px}
+  .game-actions .delete-game-action{opacity:1;transform:none;pointer-events:auto}
 }
 
 @media(max-width:600px){
+  .notice-row{display:grid;grid-template-columns:36px minmax(0,1fr) 40px;align-items:start;gap:10px;padding:14px}
+  .notice-row>.notice-icon{grid-column:1;grid-row:1/span 2}
+  .notice-row>div{grid-column:2;min-width:0;overflow-wrap:anywhere}
+  .notice-row p,.notice-row time{overflow-wrap:anywhere}
+  .notice-row .delivery-status{grid-column:2;grid-row:2;justify-self:start;margin-top:6px}
+  .notice-row>.delete-notice{grid-column:3;grid-row:1;width:40px;height:40px;margin:0}
+  .notice-row>i{position:static;grid-column:3;grid-row:2;justify-self:center;align-self:center}
+  .notice-row>div{min-width:0;flex:1}
+  .message-bubble p,.conversation b,.conversation span{overflow-wrap:anywhere}
+  .detail-buttons{width:100%;flex-wrap:wrap;overflow:visible}
+  .detail-buttons>*{flex:1 1 145px;min-width:0;justify-content:center;white-space:normal}
+  .term-hero>div:nth-child(2){min-width:0;flex:1}
+  .term-hero h2,.term-hero p{overflow-wrap:anywhere}
+  .term-actions{flex-wrap:wrap;overflow:visible}
+  .term-actions>*{flex:1 1 145px;min-width:0;justify-content:center;white-space:normal}
+  .announcement-form,.announcement-card{min-width:0}
+  .announcement-voice-row input{min-width:0;width:100%}
+  .announcement-attachment{max-width:100%;overflow-wrap:anywhere}
+  .sheet-cards{grid-template-columns:minmax(0,1fr)}
+  .sheet-card-wrap,.sheet-card{min-width:0}
+  .sheet-card h3,.sheet-card footer{overflow-wrap:anywhere}
   .people-table{width:100%;min-width:0;table-layout:fixed}
   .people-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   .people-table tbody{display:grid;gap:10px;padding:10px}
