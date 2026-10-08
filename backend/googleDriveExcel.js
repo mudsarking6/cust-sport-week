@@ -1,30 +1,33 @@
 import { Readable } from 'node:stream';
 import { google } from 'googleapis';
 import XLSX from 'xlsx';
+import { createGoogleOAuthClient, GOOGLE_DRIVE_SCOPE } from './googleDriveOAuth.js';
 
 const columns = [
   'Student Name', 'Registration No', 'Department', 'Semester', 'Section',
   'Contact No', 'Remarks', 'Game', 'Created At'
 ];
 const xlsxMimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const scopes = ['https://www.googleapis.com/auth/drive'];
-
 let driveClient;
+
+export function createDriveOAuthClient(env = process.env) {
+  const clientId = env.GOOGLE_OAUTH_CLIENT_ID?.trim();
+  const clientSecret = env.GOOGLE_OAUTH_CLIENT_SECRET?.trim();
+  const redirectUri = env.GOOGLE_OAUTH_REDIRECT_URI?.trim();
+  const refreshToken = env.GOOGLE_OAUTH_REFRESH_TOKEN?.trim();
+  if (!clientId || !clientSecret || !redirectUri || !refreshToken) {
+    throw new Error('Google Drive OAuth is not configured. Set the OAuth client ID, client secret, redirect URI, and refresh token.');
+  }
+
+  const auth = createGoogleOAuthClient(clientId, clientSecret, redirectUri);
+  auth.setCredentials({ refresh_token: refreshToken, scope: GOOGLE_DRIVE_SCOPE });
+  return auth;
+}
 
 function getDriveClient() {
   if (driveClient) return driveClient;
   google.options({ timeout: 15000 });
-  const value = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
-  if (!value) throw new Error('Google Drive credentials are not configured.');
-
-  let credentials;
-  try {
-    credentials = JSON.parse(value);
-  } catch {
-    throw new Error('Google Drive credentials must be valid JSON.');
-  }
-
-  const auth = new google.auth.GoogleAuth({ credentials, scopes });
+  const auth = createDriveOAuthClient();
   driveClient = google.drive({ version: 'v3', auth });
   return driveClient;
 }

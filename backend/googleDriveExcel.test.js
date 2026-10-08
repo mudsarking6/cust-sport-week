@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import XLSX from 'xlsx';
-import { buildExcelBuffer, buildExcelRows, syncDriveExcelFile } from './googleDriveExcel.js';
+import { GOOGLE_DRIVE_SCOPE } from './googleDriveOAuth.js';
+import {
+  buildExcelBuffer, buildExcelRows, createDriveOAuthClient, syncDriveExcelFile
+} from './googleDriveExcel.js';
 
 const ali = {
   _id: 'internal-id-not-exported',
@@ -17,6 +20,26 @@ const ali = {
   sheet_id: 'internal-sheet-id-not-exported',
   created_at: '2026-10-08 14:20:40'
 };
+
+test('Drive OAuth client uses the configured user refresh token', () => {
+  const auth = createDriveOAuthClient({
+    GOOGLE_OAUTH_CLIENT_ID: 'test-client-id',
+    GOOGLE_OAUTH_CLIENT_SECRET: 'test-client-secret',
+    GOOGLE_OAUTH_REDIRECT_URI: 'http://localhost:4317/oauth2/callback',
+    GOOGLE_OAUTH_REFRESH_TOKEN: 'test-refresh-token'
+  });
+
+  assert.equal(auth.credentials.refresh_token, 'test-refresh-token');
+  assert.equal(auth.credentials.scope, GOOGLE_DRIVE_SCOPE);
+  assert.equal(GOOGLE_DRIVE_SCOPE, 'https://www.googleapis.com/auth/drive.file');
+});
+
+test('Drive OAuth client rejects missing configuration without exposing credentials', () => {
+  assert.throws(
+    () => createDriveOAuthClient({ GOOGLE_OAUTH_CLIENT_ID: 'test-client-id' }),
+    /Google Drive OAuth is not configured/
+  );
+});
 
 test('buildExcelRows emits only the agreed student columns', () => {
   assert.deepEqual(buildExcelRows([ali], 'Cricket'), [

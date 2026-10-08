@@ -10,6 +10,7 @@ data/*.db
 **/*credential*
 **/*.pem
 **/*.key
+/.google-oauth-refresh-token
 /uploads/
 .vercel/
 npm-debug.log*

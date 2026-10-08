@@ -56,14 +56,23 @@ MongoDB remains the source of truth. Each MongoDB `sheets` document gets one `.x
 
 To enable synchronization:
 
-1. In Google Cloud, enable the Google Drive API and create a service account.
-2. In your Google Drive, create a folder named `CUST Sports Week`, share it with the service-account email as an Editor, and copy the folder ID.
-3. Add these variables to the backend service environment in Railway or Render:
-   - `GOOGLE_SERVICE_ACCOUNT_JSON` — the service account JSON document
-   - `GOOGLE_DRIVE_FOLDER_ID` — the folder ID from step 2
-4. Redeploy/restart the backend after setting the variables.
+1. In Google Cloud, enable the Google Drive API, configure the OAuth consent screen, and create an OAuth client ID. Use a **Web application** client and add this exact authorized redirect URI: `http://localhost:4317/oauth2/callback`.
+2. Add the OAuth client ID, client secret, and redirect URI to your local PowerShell environment. Do not put secrets in source files:
 
-Generated Excel files are shared as **Anyone with the link — Viewer**, preserving the existing link-access behavior. Anyone who obtains a file URL can see its student rows, including contact numbers. Do not store passwords or other credentials in player records. Never put the service-account JSON in frontend configuration, `info.env`, or Git.
+   ```powershell
+   $env:GOOGLE_OAUTH_CLIENT_ID = "your-client-id"
+   $env:GOOGLE_OAUTH_CLIENT_SECRET = "your-client-secret"
+   $env:GOOGLE_OAUTH_REDIRECT_URI = "http://localhost:4317/oauth2/callback"
+   npm run google:oauth --workspace backend
+   ```
+
+3. Open the authorization URL printed by the setup command and sign in as the Google account that owns the Drive folder. The script receives the callback locally and writes the refresh token to `.google-oauth-refresh-token` in the repository root. It does not print the token; that file is ignored by Git. Copy its contents securely into Railway as `GOOGLE_OAUTH_REFRESH_TOKEN`.
+4. Configure the Railway backend variables `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `GOOGLE_OAUTH_REFRESH_TOKEN`, and `GOOGLE_DRIVE_FOLDER_ID`. Keep the folder ID set to `145XJbOAl-zTeOzA3xsJ3qUGKWnPO49Yo`.
+5. Redeploy/restart the backend after setting the variables. The backend uses the refresh token to obtain access tokens automatically; it does not require an interactive sign-in on server startup.
+
+The backend uses the narrower Google Drive `drive.file` OAuth scope. The setup URL and backend client are configured for that same scope; generate and install a new refresh token after changing scopes. This scope only allows the app to access files created by or explicitly opened with the app. If the configured folder was not created by this app, it must be explicitly authorized (for example, selected through Google Picker) for Drive operations in that folder to succeed. For an external OAuth consent screen, publish the app as required: refresh tokens for an app left in Testing mode can expire after seven days. Never commit the client secret, refresh token, `.google-oauth-refresh-token`, or OAuth credential files.
+
+Generated Excel files are shared as **Anyone with the link — Viewer**, preserving the existing link-access behavior. Anyone who obtains a file URL can see its student rows, including contact numbers. Do not store passwords or other credentials in player records. Keep all Google OAuth secrets on the backend and out of frontend configuration, `info.env`, and Git.
 
 ## Excel columns
 

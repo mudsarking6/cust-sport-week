@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --watch index.js",
     "start": "node index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "google:oauth": "node scripts/googleDriveOAuthSetup.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
